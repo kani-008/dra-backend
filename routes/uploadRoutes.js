@@ -2,9 +2,11 @@
 
 const express = require('express');
 const multer = require('multer');
+const mongoose = require('mongoose');
 const { uploadFile, getUploadHistory, getUploadById, deleteUpload } = require('../controllers/uploadController');
 const { protect } = require('../middleware/authMiddleware');
 const { uploadLimiter } = require('../middleware/securityMiddleware');
+const logger = require('../utils/logger');
 
 const router = express.Router();
 
@@ -26,6 +28,32 @@ const upload = multer({
 
 // All upload routes require a valid JWT
 router.use(protect);
+
+/**
+ * Middleware to validate MongoDB ObjectId
+ * Handles invalid IDs with helpful error messages
+ */
+const validateObjectId = (paramName = 'uploadId') => {
+  return (req, res, next) => {
+    const id = req.params[paramName];
+    
+    // Check if it's a valid MongoDB ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      logger.warn('Invalid ObjectId received', {
+        paramName,
+        received: id,
+        format: typeof id,
+        path: req.path
+      });
+      
+      return res.status(400).json({
+        success: false,
+        message: `Invalid ${paramName}. Expected MongoDB ObjectId format, but received: "${id}". Please check if the ID is correct.`
+      });
+    }
+    next();
+  };
+};
 
 /**
  * Multer error handler middleware.
@@ -66,7 +94,7 @@ router.post('/', uploadLimiter, handleMulterError, uploadFile);
 
 // Upload management
 router.get('/', getUploadHistory);
-router.get('/:uploadId', getUploadById);
-router.delete('/:uploadId', deleteUpload);
+router.get('/:uploadId', validateObjectId('uploadId'), getUploadById);
+router.delete('/:uploadId', validateObjectId('uploadId'), deleteUpload);
 
 module.exports = router;

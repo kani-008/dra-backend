@@ -6,17 +6,66 @@ const logger = require('../utils/logger');
 /**
  * Enterprise standard security headers
  */
-const securityHeaders = helmet();
+const securityHeaders = helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      connectSrc: ["'self'", "https://kanish08.app.n8n.cloud", "https://deep-research-assistant-rag.vercel.app"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      fontSrc: ["'self'", "data:"],
+    },
+  },
+  hsts: {
+    maxAge: 31536000, // 1 year
+    includeSubDomains: true,
+    preload: true,
+  },
+  frameguard: {
+    action: 'deny',
+  },
+});
 
 /**
- * Configure CORS for restricted domain access
+ * Configure CORS for production and development
+ * Allows requests from frontend and local development
  */
+const getAllowedOrigins = () => {
+  const clientOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:3000';
+  const backendUrl = process.env.BACKEND_URL || 'http://localhost:5000';
+  const nodeEnv = process.env.NODE_ENV || 'development';
+
+  const origins = [
+    clientOrigin,
+    // Allow local development
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:3001',
+  ];
+
+  // In development, allow all localhost variants
+  if (nodeEnv === 'development') {
+    origins.push('http://localhost:*', 'http://127.0.0.1:*');
+  }
+
+  logger.info('CORS allowed origins configured', {
+    environment: nodeEnv,
+    primaryOrigin: clientOrigin,
+    totalOrigins: origins.length,
+  });
+
+  return origins;
+};
+
 const corsMiddleware = cors({
-  origin: process.env.CLIENT_ORIGIN || '*', // Restricted to frontend URL in production
+  origin: getAllowedOrigins(),
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-API-Key'],
   credentials: true,
-  maxAge: 3600 // 1 hour Preflight Cache
+  maxAge: 3600, // 1 hour Preflight Cache
+  optionsSuccessStatus: 200,
 });
 
 /**

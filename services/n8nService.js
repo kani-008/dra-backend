@@ -9,11 +9,19 @@ const N8N_UPLOAD_WEBHOOK = process.env.N8N_UPLOAD_WEBHOOK || 'http://localhost:5
 const N8N_DELETE_WEBHOOK = process.env.N8N_DELETE_WEBHOOK || 'http://localhost:5678/webhook/delete';
 
 const RETRY_CONFIG = {
-  maxRetries: 3,
+  maxRetries: parseInt(process.env.N8N_MAX_RETRIES || '3'),
   retryDelay: 1000,
   backoffMultiplier: 2,
-  timeout: 120000,
+  timeout: parseInt(process.env.N8N_REQUEST_TIMEOUT || '120000'),
 };
+
+// Log N8N configuration on startup (production safe)
+logger.info('N8N Service configured', {
+  chat_webhook: N8N_CHAT_WEBHOOK?.split('/webhook/')[0] + '/webhook/[hidden]',
+  upload_webhook: N8N_UPLOAD_WEBHOOK?.split('/webhook/')[0] + '/webhook/[hidden]',
+  timeout: RETRY_CONFIG.timeout,
+  maxRetries: RETRY_CONFIG.maxRetries,
+});
 
 const retryWithBackoff = async (fn, retries = 0) => {
   try {
@@ -21,7 +29,10 @@ const retryWithBackoff = async (fn, retries = 0) => {
   } catch (error) {
     if (retries < RETRY_CONFIG.maxRetries) {
       const delay = RETRY_CONFIG.retryDelay * Math.pow(RETRY_CONFIG.backoffMultiplier, retries);
-      logger.warn(`Retry attempt ${retries + 1}/${RETRY_CONFIG.maxRetries} after ${delay}ms`, { error: error.message });
+      logger.warn(`Retry attempt ${retries + 1}/${RETRY_CONFIG.maxRetries} after ${delay}ms`, { 
+        error: error.message,
+        status: error.response?.status 
+      });
       await new Promise((r) => setTimeout(r, delay));
       return retryWithBackoff(fn, retries + 1);
     }
@@ -41,14 +52,25 @@ const sendChatToN8n = async (question, previousChats = null, metadata = {}) => {
     const response = await retryWithBackoff(() =>
       axios.post(N8N_CHAT_WEBHOOK, payload, {
         timeout: RETRY_CONFIG.timeout,
-        headers: { 'Content-Type': 'application/json', 'User-Agent': 'Deep-Research-Assistant/2.0' },
+        headers: { 
+          'Content-Type': 'application/json', 
+          'User-Agent': 'Deep-Research-Assistant/2.0',
+          'X-Request-ID': metadata.requestId || `req-${Date.now()}`,
+        },
       })
     );
     const processingTime = Date.now() - startTime;
     logger.info('n8n chat request successful', { processingTime, contextSize: previousChats?.length || 0 });
     return { success: true, data: response.data, processingTime };
   } catch (error) {
-    logger.error('n8n chat service failed after retries', { error: error.message, statusCode: error.response?.status });
+    const processingTime = Date.now() - startTime;
+    logger.error('n8n chat service failed after retries', { 
+      error: error.message, 
+      statusCode: error.response?.status,
+      webhook: N8N_CHAT_WEBHOOK,
+      processingTime,
+      code: error.code
+    });
     return generateFallbackResponse(error);
   }
 };

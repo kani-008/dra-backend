@@ -271,32 +271,41 @@ curl http://localhost:5000/health
 ```
 
 ### Register User
-```bash
-curl -X POST http://localhost:5000/api/v1/auth/signup \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "John Doe",
-    "email": "john@example.com",
-    "password": "password123",
-    "passwordConfirm": "password123"
-  }'
+```javascript
+const API = import.meta.env.VITE_API_URL;
+
+axios.post(`${API}/api/v1/auth/signup`, {
+  name: "John Doe",
+  email: "john@example.com",
+  password: "password123",
+  passwordConfirm: "password123"
+}, {
+  headers: { "Content-Type": "application/json" }
+});
 ```
 
 ### Send Chat Message
-```bash
-curl -X POST http://localhost:5000/api/v1/chat \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "message": "What is AI?",
-    "sessionId": "session-123"
-  }'
+```javascript
+const API = import.meta.env.VITE_API_URL;
+
+axios.post(`${API}/api/v1/chat`, {
+  message: "What is AI?",
+  sessionId: "session-123"
+}, {
+  headers: { 
+    "Authorization": "Bearer YOUR_TOKEN",
+    "Content-Type": "application/json" 
+  }
+});
 ```
 
 ### Get Chat History
-```bash
-curl http://localhost:5000/api/v1/chat/history?page=1&limit=20 \
-  -H "Authorization: Bearer YOUR_TOKEN"
+```javascript
+const API = import.meta.env.VITE_API_URL;
+
+axios.get(`${API}/api/v1/chat/history?page=1&limit=20`, {
+  headers: { "Authorization": "Bearer YOUR_TOKEN" }
+});
 ```
 
 ---
