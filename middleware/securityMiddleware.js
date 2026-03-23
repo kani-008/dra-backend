@@ -12,11 +12,25 @@ const securityHeaders = helmet();
  * Configure CORS for restricted domain access
  */
 const corsMiddleware = cors({
-  origin: process.env.CLIENT_ORIGIN || '*', // Restricted to frontend URL in production
+  origin: (origin, callback) => {
+    const allowedOrigins = [
+      "http://localhost:5173",
+      process.env.FRONTEND_URL
+    ];
+
+    // Allow requests with no origin (like Postman)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("CORS not allowed"));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   credentials: true,
-  maxAge: 3600 // 1 hour Preflight Cache
+  maxAge: 3600
 });
 
 /**
